@@ -41,6 +41,7 @@
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
             align-items: center;
         }
+
         .function-group {
             display: flex;
             gap: 16px;
@@ -51,6 +52,7 @@
             border-radius: 14px;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
         .function-group:hover {
             transform: translateY(-2px);
             box-shadow: 0 2px 8px rgba(var(--theme-color-rgb), 0.1);
@@ -185,13 +187,14 @@
             background: white;
             padding: 32px;
             border-radius: 18px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
             z-index: 1001;
             max-width: 80%;
             max-height: 80%;
             overflow-y: auto;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
         .modal-overlay {
             display: none;
             position: fixed;
@@ -199,7 +202,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0, 0, 0, 0.5);
             z-index: 1000;
         }
     </style>
@@ -233,13 +236,14 @@
             background: white;
             padding: 32px;
             border-radius: 18px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
             z-index: 1001;
             max-width: 80%;
             max-height: 80%;
             overflow-y: auto;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
         .modal-overlay {
             display: none;
             position: fixed;
@@ -247,7 +251,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0, 0, 0, 0.5);
             z-index: 1000;
         }
     </style>
@@ -259,6 +263,8 @@
         <div class="function-group" style="margin-bottom: 20px;">
             <button id="themeToggle">切换主题</button>
             <button id="instructionBtn">使用说明</button>
+            <button onclick="document.getElementById('dashboardFile').click()">数据大屏</button>
+            <input type="file" id="dashboardFile" hidden accept=".xlsx, .xls" onchange="loadDashboardData(this.files)">
         </div>
 
         <!-- 积欠学分查询模块 -->
@@ -272,10 +278,10 @@
         <!-- 漏修课程查询模块 -->
         <div class="function-group" style="margin-bottom: 20px;">
             <button onclick="document.getElementById('configFile').click()">
-                漏修课程查询 ① 
+                漏修课程查询 ①
             </button>
             <button onclick="document.getElementById('missingFile').click()">
-                漏修课程查询 ② 
+                漏修课程查询 ②
             </button>
             <input type="file" id="configFile" hidden accept=".xlsx, .xls" onchange="loadLeakedCourses(this.files)">
             <input type="file" id="missingFile" hidden accept=".xlsx, .xls" onchange="handleMissingFile(this.files)">
@@ -286,9 +292,12 @@
             <button onclick="document.getElementById('substitutionListFile').click()">实时课程替代 ① </button>
             <button onclick="document.getElementById('substitutionMissingFile').click()">实时课程替代 ② </button>
             <button onclick="document.getElementById('substitutionStudentFile').click()">实时课程替代 ③</button>
-            <input type="file" id="substitutionListFile" hidden accept=".xlsx, .xls" onchange="loadSubstitutionList(this.files)">
-            <input type="file" id="substitutionMissingFile" hidden accept=".xlsx, .xls" onchange="loadSubstitutionMissing(this.files)">
-            <input type="file" id="substitutionStudentFile" hidden accept=".xlsx, .xls" onchange="loadSubstitutionStudent(this.files)">
+            <input type="file" id="substitutionListFile" hidden accept=".xlsx, .xls"
+                onchange="loadSubstitutionList(this.files)">
+            <input type="file" id="substitutionMissingFile" hidden accept=".xlsx, .xls"
+                onchange="loadSubstitutionMissing(this.files)">
+            <input type="file" id="substitutionStudentFile" hidden accept=".xlsx, .xls"
+                onchange="loadSubstitutionStudent(this.files)">
         </div>
     </div>
 
@@ -306,8 +315,21 @@
         // 全局存储漏修课程数据
         let leakedCourses = [];
         // 全局存储课程替代数据
+        // 数据大屏处理函数
+        async function loadDashboardData(files) {
+            if (!files.length) return;
+            try {
+                const workbook = await readExcel(files[0]);
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rawData = XLSX.utils.sheet_to_json(worksheet);
+                localStorage.setItem('dashboardData', JSON.stringify(rawData));
+                window.open('dataDashboard.html');
+            } catch (e) {
+                alert('数据加载失败: ' + e.message);
+            }
+        }
         // 使用说明弹窗
-        document.getElementById('instructionBtn').addEventListener('click', function() {
+        document.getElementById('instructionBtn').addEventListener('click', function () {
             const originalContent = `【功能模块说明】\n本系统包含三个核心功能模块：积欠学分查询、漏修课程查询、实时课程替代。\n\n【输入与输出】 \n- 输入一共涉及：学生名单文件、漏修课程文件、课程替换文件 \n- 输出有：积欠学分名单、漏修课程学生名单、课程替换后的学生漏修名单 \n\n【文件结构】 \n- 学生名单文件必须包含列：学号、姓名、多修课程、漏修课程、必修标准、必修已修等\n- 漏修课程文件必须包含列：漏修\n- 课程替换文件必须包含列：多修课程、漏修课程 \n\n【操作流程指引】\n1. 积欠学分查询（功能一）\n   - 操作：点击"积欠学分查询"按钮，选择包含学生信息的Excel文件（需包含必修、专选、公选等学分相关列）。\n\n2. 漏修课程查询（功能二）\n   - 第一步：点击"漏修课程查询 ①"按钮，上传含"漏修"列的课程标准Excel文件（支持.xlsx/.xls格式，大小≤10MB）。\n   - 第二步：待系统提示加载完成后，点击"漏修课程查询 ②"按钮，上传学生名单Excel文件（需包含学号、姓名等信息）。\n\n3. 实时课程替代（功能三）\n   - 第一步：点击"实时课程替代 ①"按钮，上传含"多修课程"和"漏修课程"列的替代清单文件。\n   - 第二步：点击"实时课程替代 ②"按钮，上传漏修名单（需通过功能二得出，包含学号、姓名、漏修课程列）。\n   - 第三步：点击"实时课程替代 ③"按钮，上传学生名单（需包含学号、姓名、多修课程列）。\n\n【注意事项】\n- 若出现卡顿，刷新浏览器页面即可恢复。\n- 所有上传文件需保证结构正确，课程名称无歧义。\n- 本系统由同学无偿开发，欢迎反馈问题；开发者不保证系统结果的绝对准确与完整。`;
             const overlay = document.createElement('div');
             overlay.className = 'modal-overlay';
@@ -337,12 +359,12 @@
 
             try {
                 const maxSize = 10 * 1024 * 1024; // 10MB
-        if (files[0].size > maxSize) {
-            throw new Error('文件大小超过10MB限制');
-        }
-        if (!files[0].name.match(/\.xlsx?$/i)) {
-            throw new Error('仅支持Excel文件格式');
-        }
+                if (files[0].size > maxSize) {
+                    throw new Error('文件大小超过10MB限制');
+                }
+                if (!files[0].name.match(/\.xlsx?$/i)) {
+                    throw new Error('仅支持Excel文件格式');
+                }
                 const workbook = await readExcel(files[0]);
                 const worksheet = workbook.Sheets[workbook.SheetNames[0]];
                 if (!worksheet['!ref']) {
@@ -379,9 +401,9 @@
                 const workbook = await readExcel(files[0]);
                 if (!workbook.SheetNames.length) throw new Error('Excel文件无工作表');
                 const results = processDeficit(workbook);
-        document.getElementById('statusInfo').textContent = `已加载 ${results.length} 名学生信息`;
-        updateTable(results);
-        exportToExcel(results, '积欠学分学生名单.xlsx');
+                document.getElementById('statusInfo').textContent = `已加载 ${results.length} 名学生信息`;
+                updateTable(results);
+                exportToExcel(results, '积欠学分学生名单.xlsx');
             } catch (error) {
                 alert('积欠文件处理失败: ' + error.message);
             }
@@ -400,9 +422,9 @@
                 if (!jsonData[0] || !('多修课程' in jsonData[0]) || !('漏修课程' in jsonData[0])) {
                     throw new Error('替代清单文件需包含【多修课程】和【漏修课程】列');
                 }
-                substitutionList = jsonData.map(row => ({ 
-                    多修课程: row.多修课程?.split(',').map(c => c.trim()).filter(c => c), 
-                    漏修课程: row.漏修课程?.split(',').map(c => c.trim()).filter(c => c) 
+                substitutionList = jsonData.map(row => ({
+                    多修课程: row.多修课程?.split(',').map(c => c.trim()).filter(c => c),
+                    漏修课程: row.漏修课程?.split(',').map(c => c.trim()).filter(c => c)
                 }));
                 document.getElementById('statusInfo').textContent = `已加载 ${substitutionList.length} 条课程替代规则，可继续执行第二步上传课程替换清单`;
             } catch (error) {
@@ -421,10 +443,10 @@
                 if (!jsonData[0] || !('学号' in jsonData[0]) || !('姓名' in jsonData[0]) || !('漏修课程' in jsonData[0])) {
                     throw new Error('漏修名单需包含【学号】、【姓名】、【漏修课程】列');
                 }
-                substitutionMissingData = jsonData.map(row => ({ 
-                    学号: row.学号, 
-                    学生: row.姓名, 
-                    漏修课程: row.漏修课程?.split(',').map(c => c.trim()).filter(c => c) || [] 
+                substitutionMissingData = jsonData.map(row => ({
+                    学号: row.学号,
+                    学生: row.姓名,
+                    漏修课程: row.漏修课程?.split(',').map(c => c.trim()).filter(c => c) || []
                 }));
                 document.getElementById('statusInfo').textContent = `已加载 ${substitutionMissingData.length} 条漏修记录，可进行第三步上传学生名单`;
             } catch (error) {
@@ -445,10 +467,10 @@
                 if (!jsonData[0] || !('学号' in jsonData[0]) || !('姓名' in jsonData[0]) || !('多修课程' in jsonData[0])) {
                     throw new Error('学生名单需包含【学号】、【姓名】、【多修课程】列');
                 }
-                substitutionStudentData = jsonData.map(row => ({ 
-                    学号: row.学号, 
-                    学生: row.姓名, 
-                    多修课程: row.多修课程?.split(',').map(c => c.trim()).filter(c => c) || [] 
+                substitutionStudentData = jsonData.map(row => ({
+                    学号: row.学号,
+                    学生: row.姓名,
+                    多修课程: row.多修课程?.split(',').map(c => c.trim()).filter(c => c) || []
                 }));
                 const results = processSubstitution();
                 updateTable(results);
@@ -469,9 +491,9 @@
                 const remainingCourses = missing.漏修课程.filter(leakedCourse => {
                     // 查找是否有替代规则匹配当前漏修课程
                     const rule = substitutionList.find(r => r.漏修课程.includes(leakedCourse));
-            if (!rule) return true; // 无替代规则，保留漏修
-            // 检查多修课程是否包含规则中的多修课程列
-            return !rule.多修课程.some(subCourse => student.多修课程.includes(subCourse));
+                    if (!rule) return true; // 无替代规则，保留漏修
+                    // 检查多修课程是否包含规则中的多修课程列
+                    return !rule.多修课程.some(subCourse => student.多修课程.includes(subCourse));
                 });
                 return {
                     学号: missing.学号,
@@ -518,13 +540,13 @@
         function processDeficit(workbook) {
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];
             const data = XLSX.utils.sheet_to_json(worksheet);
-        const requiredFields = ['必修已修', '必修标准', '专选已修', '专选标准', '公选已修', '公选标准', '实践已修', '奖励学分'];
+            const requiredFields = ['必修已修', '必修标准', '专选已修', '专选标准', '公选已修', '公选标准', '实践已修', '奖励学分'];
 
             return data.map(row => {
-            if (!requiredFields.every(field => field in row)) {
-                console.warn('缺少必要字段，跳过该记录');
-                return null;
-            }
+                if (!requiredFields.every(field => field in row)) {
+                    console.warn('缺少必要字段，跳过该记录');
+                    return null;
+                }
                 const compulsoryBias = row.必修已修 - row.必修标准;
                 const specialBias = row.专选已修 - row.专选标准;
                 const porCBias = (row.公选已修 - row.公选标准) +
@@ -549,7 +571,7 @@
         function processMissing(workbook) {
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];
             const data = XLSX.utils.sheet_to_json(worksheet);
-        const requiredFields = ['必修已修', '必修标准', '专选已修', '专选标准', '公选已修', '公选标准', '实践已修', '奖励学分'];
+            const requiredFields = ['必修已修', '必修标准', '专选已修', '专选标准', '公选已修', '公选标准', '实践已修', '奖励学分'];
 
             // 预处理课程名称
             const cleanedStandard = leakedCourses.map(c =>
@@ -557,16 +579,16 @@
             );
 
             return data.map(row => {
-            if (!requiredFields.every(field => field in row)) {
-                console.warn('缺少必要字段，跳过该记录');
-                return null;
-            }
+                if (!requiredFields.every(field => field in row)) {
+                    console.warn('缺少必要字段，跳过该记录');
+                    return null;
+                }
                 const leaked = [];
                 if (!('漏修课程' in row)) {
-                console.warn('学生记录缺少"漏修课程"字段');
-                return null;
-            }
-            if (row.漏修课程) {
+                    console.warn('学生记录缺少"漏修课程"字段');
+                    return null;
+                }
+                if (row.漏修课程) {
                     row.漏修课程.split(',')
                         .map(c => c.trim())
                         .filter(c => c)
@@ -578,10 +600,10 @@
                         });
                 }
                 return leaked.length ? {
-                学号: row.学号,
-                姓名: row.姓名,
-                漏修课程: leaked.join(', ')
-            } : null;
+                    学号: row.学号,
+                    姓名: row.姓名,
+                    漏修课程: leaked.join(', ')
+                } : null;
             }).filter(Boolean);
         }
 

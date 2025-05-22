@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Nau大数据分析平台</title>
+    <link rel="icon" href="./assets/logo.jpg" type="image/jpeg">
+    <script src="./js/echarts.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f0f2f5;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-title {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+
+        .chart {
+            width: 100%;
+            height: 400px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="chart-container">
+        <div class="chart-title">学院分布分析</div>
+        <div id="collegeChart" class="chart"></div>
+    </div>
+
+    <div class="chart-container">
+        <div class="chart-title">学分完成率分析</div>
+        <div id="creditChart" class="chart"></div>
+    </div>
+
+    <div class="chart-container">
+        <div class="chart-title">证书获取情况</div>
+        <div id="certificateChart" class="chart"></div>
+    </div>
+
+    <script>
+        // 从本地存储获取数据并处理解析错误
+        let rawData = [];
+        let collegeChart, creditChart, certChart, gradeChart, rewardChart;
+        try {
+            const storedData = localStorage.getItem('dashboardData');
+            if (storedData) {
+                rawData = JSON.parse(storedData);
+            }
+            if (!Array.isArray(rawData)) {
+                throw new Error('dashboardData 格式不正确，应为数组');
+            }
+        } catch (error) {
+            console.error('数据解析失败:', error.message);
+            alert('数据加载失败，请检查localStorage中的dashboardData格式');
+        }
+        if (rawData.length === 0) {
+            console.error('未获取到有效数据，请检查localStorage中的dashboardData是否存在');
+            alert('未获取到有效数据，请先导入数据');
+        } else {
+            // 学院分布图表
+            collegeChart = echarts.init(document.getElementById('collegeChart'));
+            const collegeData = processCollegeData(rawData);
+            collegeChart.setOption({
+                tooltip: { trigger: 'item' },
+                legend: { type: 'scroll', orient: 'vertical', right: 10, top: 20, bottom: 20 }, series: [{ type: 'pie', data: collegeData, roseType: 'radius', label: { show: true, formatter: '{b}: {d}%' }, emphasis: { label: { show: true, fontSize: 14 } } }]
+            });
+
+            // 学分完成率图表
+            function processCreditData(data) {
+                const credits = ['必修', '专选', '公选', '实践'];
+                return credits.map(type => {
+                    const avg = data.reduce((sum, item) => {
+                        return sum + (item[`${type}已修`] / item[`${type}标准`]);
+                    }, 0) / data.length * 100;
+                    return Math.round(avg);
+                });
+            }
+
+            creditChart = echarts.init(document.getElementById('creditChart'));
+            creditChart.setOption({
+                tooltip: { trigger: 'axis' },
+                xAxis: { type: 'category', data: ['必修', '专选', '公选', '实践'] },
+                yAxis: { type: 'value', name: '完成率（%）', max: 120 },
+                legend: {
+                    data: ['平均完成率'],
+                    top: 20
+                },
+                series: [{
+                    type: 'bar',
+                    name: '平均完成率',
+                    data: processCreditData(rawData),
+                    itemStyle: { color: '#5470C6' },
+                    label: { show: true, position: 'top' }
+                }]
+            });
+
+            function processCollegeData(data) {
+                const collegeMap = new Map();
+                data.forEach(item => {
+                    const college = item.学院;
+                    collegeMap.set(college, (collegeMap.get(college) || 0) + 1);
+                });
+                return Array.from(collegeMap).map(([name, value]) => ({ name, value }));
+            }
+
+
+
+            function processCreditData(data) {
+                const credits = ['必修', '专选', '公选', '实践'];
+                return credits.map(type => {
+                    const avg = data.reduce((sum, item) => {
+                        return sum + (item[`${type}已修`] / item[`${type}标准`]);
+                    }, 0) / data.length * 100;
+                    return Math.round(avg);
+                });
+            }
+
+
+
+            function processCertificateData(data) {
+                const certs = ['英四', '英六', '计一', '计二'];
+                return {
+                    radar: {
+                        indicator: certs.map(name => ({ name, max: 100 }))
+                    },
+                    series: [{
+                        type: 'radar',
+                        data: [{
+                            value: certs.map(cert => {
+                                return Math.round((data.filter(item => {
+                                    // 修改证书值转换逻辑
+                                    const value = item[cert];
+                                    return value === true || value === 'true' || value === 1 || value === '1';
+                                }).length / data.length) * 100);
+                            })
+                        }]
+                    }]
+                };
+            }
+
+            // 证书获取图表
+            const certOptions = processCertificateData(rawData);
+            certChart = echarts.init(document.getElementById('certificateChart'));
+            certChart.setOption({
+                title: { text: '证书获取率（%）', left: 'center' },
+                ...certOptions,
+                series: [{
+                    ...certOptions.series[0],
+                    label: { show: true, formatter: '{c}%' },
+                    areaStyle: {}
+                }]
+            });
+
+
+
+
+
+
+
+
+            console.log('证书数据样本:', rawData.slice(0, 3).map(d => ({
+                英四: d.英四,
+                英六: d.英六,
+                计一: d.计一,
+                计二: d.计二
+            })));
+            console.log('证书处理结果:', certOptions.series[0].data[0].value);
+
+
+
+
+
+
+
+
+
+            // 窗口调整时自适应图表
+            window.addEventListener('resize', () => {
+                if (collegeChart) collegeChart.resize();
+                if (creditChart) creditChart.resize();
+                if (certChart) certChart.resize();
+                if (gradeChart) gradeChart.resize();
+                if (rewardChart) rewardChart.resize();
+            });
+        }
+
+    </script>
+    <div class="chart-container">
+        <div class="chart-title">年级人数分布</div>
+        <div id="gradeChart" class="chart"></div>
+    </div>
+
+    <div class="chart-container">
+        <div class="chart-title">奖励学分分布</div>
+        <div id="rewardChart" class="chart"></div>
+    </div>
+</body>
+
+</html>
