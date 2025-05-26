@@ -278,10 +278,10 @@
         <!-- 漏修课程查询模块 -->
         <div class="function-group" style="margin-bottom: 20px;">
             <button onclick="document.getElementById('configFile').click()">
-                漏修课程查询 ①
+                导出学生漏修课程 ① 上传漏修课程名单
             </button>
             <button onclick="document.getElementById('missingFile').click()">
-                漏修课程查询 ②
+                导出学生漏修课程 ② 上传学生名单文件
             </button>
             <input type="file" id="configFile" hidden accept=".xlsx, .xls" onchange="loadLeakedCourses(this.files)">
             <input type="file" id="missingFile" hidden accept=".xlsx, .xls" onchange="handleMissingFile(this.files)">
@@ -289,9 +289,9 @@
 
         <!-- 实时课程替代模块 -->
         <div class="function-group">
-            <button onclick="document.getElementById('substitutionListFile').click()">实时课程替代 ① </button>
-            <button onclick="document.getElementById('substitutionMissingFile').click()">实时课程替代 ② </button>
-            <button onclick="document.getElementById('substitutionStudentFile').click()">实时课程替代 ③</button>
+            <button onclick="document.getElementById('substitutionListFile').click()">实时课程替代 ① 上传课程替代规则 </button>
+            <button onclick="document.getElementById('substitutionMissingFile').click()">实时课程替代 ② 上传学生漏修课程 </button>
+            <button onclick="document.getElementById('substitutionStudentFile').click()">实时课程替代 ③ 上传学生名单文件</button>
             <input type="file" id="substitutionListFile" hidden accept=".xlsx, .xls"
                 onchange="loadSubstitutionList(this.files)">
             <input type="file" id="substitutionMissingFile" hidden accept=".xlsx, .xls"
@@ -422,10 +422,12 @@
                 if (!jsonData[0] || !('多修课程' in jsonData[0]) || !('漏修课程' in jsonData[0])) {
                     throw new Error('替代清单文件需包含【多修课程】和【漏修课程】列');
                 }
-                substitutionList = jsonData.map(row => ({
-                    多修课程: row.多修课程?.split(',').map(c => c.trim()).filter(c => c),
-                    漏修课程: row.漏修课程?.split(',').map(c => c.trim()).filter(c => c)
-                }));
+                substitutionList = jsonData.map(row => {
+    return {
+        多修课程: row.多修课程?.trim() || '',
+        漏修课程: (typeof row.漏修课程 === 'string' ? row.漏修课程.trim() : '').split(',').map(c => c.trim()) || []  // 确保漏修课程为字符串后再处理
+    };
+});  // 显式返回对象，修复语法格式问题
                 document.getElementById('statusInfo').textContent = `已加载 ${substitutionList.length} 条课程替代规则，可继续执行第二步上传课程替换清单`;
             } catch (error) {
                 alert('替代清单读取失败: ' + error.message);
@@ -481,27 +483,102 @@
         }
 
         // 功能三：处理课程替代逻辑
-        function processSubstitution() {
-            return substitutionMissingData.map(missing => {
-                const student = substitutionStudentData.find(s => s.学号 === missing.学号 && s.学生 === missing.学生);
-                if (!student) {
-                    console.warn(`未找到学号${missing.学号}的学生记录`);
-                    return { ...missing, 漏修课程: missing.漏修课程.join(', '), 备注: '未找到学生多修课程数据' };
-                }
-                const remainingCourses = missing.漏修课程.filter(leakedCourse => {
-                    // 查找是否有替代规则匹配当前漏修课程
-                    const rule = substitutionList.find(r => r.漏修课程.includes(leakedCourse));
-                    if (!rule) return true; // 无替代规则，保留漏修
-                    // 检查多修课程是否包含规则中的多修课程列
-                    return !rule.多修课程.some(subCourse => student.多修课程.includes(subCourse));
+        // function processSubstitution() {
+        //     return substitutionMissingData.map(missing => {
+        //         const student = substitutionStudentData.find(s => s.学号 === missing.学号 && s.学生 === missing.学生);
+        //         // console.log(student);
+        //         console.log(substitutionList);
+        //         // console.log(missing)
+        //         if (!student) {
+        //             console.warn(`未找到学号${missing.学号}的学生记录`);
+        //             return { ...missing, 漏修课程: missing.漏修课程.join(', '), 备注: '未找到学生多修课程数据' };
+        //         }
+        //         const remainingCourses = missing.漏修课程.filter(leakedCourse => { const leakedCourseTrimmed = leakedCourse.trim(); console.log('[调试] 当前处理漏修课程:', leakedCourse, 'trim后:', leakedCourseTrimmed); 
+        //             // 查找是否有替代规则匹配当前漏修课程
+        //             // 查找所有匹配当前漏修课程的规则（而非仅第一条）
+            const matchingRules = substitutionList.filter(r => r.漏修课程.includes(leakedCourseTrimmed));  // 漏修课程是数组，检查是否包含当前漏修课程
+            console.log('[调试] 匹配到的规则数量:', matchingRules.length);
+            console.log('[调试] 匹配到的规则列表:', matchingRules.map(r => ({多修课程: r.多修课程, 漏修课程: r.漏修课程})));
+            // 遍历所有匹配规则，只要任意一条满足多修课程要求即标记可替换
+            const hasValidRule = matchingRules.some(rule => {
+                const requiredSubCourses = [...new Set(rule.多修课程.split('、').map(c => c.trim()))];
+                console.log(`[替换规则调试] 处理规则「${rule.多修课程}→${rule.漏修课程}」要求的多修课程:`, requiredSubCourses);
+                const hasAnySubCourse = requiredSubCourses.some(subCourseRule => {
+                    return student.多修课程.some(sc => sc.trim() === subCourseRule);
                 });
-                return {
-                    学号: missing.学号,
-                    学生: missing.学生,
-                    漏修课程: remainingCourses.join(', ')
-                };
-            }).filter(Boolean);
+                console.log(`[替换规则调试] 规则「${rule.多修课程}→${rule.漏修课程}」多修课程匹配结果:`, hasAnySubCourse ? '匹配成功' : '匹配失败');
+                return hasAnySubCourse;
+            });
+            // 存在有效规则则不保留漏修课程，否则保留
+            // return !hasValidRule; 
+        //             if (!rule) return true; // 无替代规则，保留漏修
+        //             // 检查多修课程是否包含规则中的多修课程列
+        //             return !rule.多修课程.some(subCourse => student.多修课程.includes(subCourse));
+        //         });
+        //         return {
+        //             学号: missing.学号,
+        //             学生: missing.学生,
+        //             漏修课程: remainingCourses.join(', ')
+        //         };
+        //     }).filter(Boolean);
+        // }
+        function processSubstitution() { 
+    return substitutionMissingData.map(missing => { 
+        const student = substitutionStudentData.find(s => s.学号 === missing.学号 && s.学生 === missing.学生); 
+        if (!student) { 
+            console.warn(`未找到学号${missing.学号}的学生记录`); 
+            return { ...missing, 漏修课程: missing.漏修课程.join(', '), 备注: '未找到学生多修课程数据' }; 
         }
+        console.log(student);
+        // console.log(substitutionList);
+        // console.log(missing); 
+        const remainingCourses = missing.漏修课程.filter(leakedCourse => { const leakedCourseTrimmed = leakedCourse.trim(); console.log('[调试] 当前处理漏修课程:', leakedCourse, 'trim后:', leakedCourseTrimmed);  
+            // 查找是否有替代规则匹配当前漏修课程（漏修课程字段为数组）
+            // 查找所有匹配当前漏修课程的规则（而非仅第一条）
+            const matchingRules = substitutionList.filter(r => r.漏修课程.includes(leakedCourseTrimmed));  // 漏修课程是数组，检查是否包含当前漏修课程
+            console.log('[调试] 匹配到的规则数量:', matchingRules.length);
+            console.log('[调试] 匹配到的规则列表:', matchingRules.map(r => ({多修课程: r.多修课程, 漏修课程: r.漏修课程})));
+            // 遍历所有匹配规则，只要任意一条满足多修课程要求即标记可替换
+            const hasValidRule = matchingRules.some(rule => {
+                const requiredSubCourses = [...new Set(rule.多修课程.split('、').map(c => c.trim()))];
+                console.log(`[替换规则调试] 处理规则「${rule.多修课程}→${rule.漏修课程}」要求的多修课程:`, requiredSubCourses);
+                const hasAnySubCourse = requiredSubCourses.some(subCourseRule => {
+                    return student.多修课程.some(sc => sc.trim() === subCourseRule);
+                });
+                console.log(`[替换规则调试] 规则「${rule.多修课程}→${rule.漏修课程}」多修课程匹配结果:`, hasAnySubCourse ? '匹配成功' : '匹配失败');
+                return hasAnySubCourse;
+            });
+            // 存在有效规则则不保留漏修课程，否则保留
+            return !hasValidRule; 
+            if (!rule) return true; // 无替代规则，保留漏修
+
+            // 检查多修课程是否包含规则中的多修课程列（数组形式）
+            // 解析规则中的多修课程并去重（防止规则重复）
+            const ruleLeakedCourseTrimmed = rule.漏修课程.trim();
+            // 仅处理当前漏修课程对应的规则（添加日志追踪规则筛选）
+            if (leakedCourseTrimmed !== ruleLeakedCourseTrimmed) {
+                console.log(`[替换规则调试] 跳过不匹配漏修课程的规则「${rule.多修课程}→${rule.漏修课程}」`);
+                return false;
+            }
+            console.log(`[替换规则调试] 开始处理匹配漏修课程的规则「${rule.多修课程}→${rule.漏修课程}」`);
+            const requiredSubCourses = [...new Set(rule.多修课程.split('、').map(c => c.trim()))];
+            console.log('[调试] 规则要求的多修课程（去重后）:', requiredSubCourses);
+            const hasAnySubCourse = requiredSubCourses.some(subCourseRule => {
+                const isMatched = student.多修课程.some(sc => sc.trim() === subCourseRule);
+                console.log(`[替换规则调试] 检查多修课程「${subCourseRule}」是否匹配学生多修课程: ${isMatched ? '匹配' : '不匹配'}`);
+                return isMatched;
+            });
+            console.log(`[替换规则调试] 漏修课程「${leakedCourse}」匹配规则「${rule.多修课程}→${rule.漏修课程}」结果: ${hasAnySubCourse ? '可替代' : '不可替代'}`);
+            // 若存在匹配的多修课程则漏修课程被替代（不保留），否则保留
+            return !hasAnySubCourse;  
+        }); 
+        return { 
+            学号: missing.学号, 
+            学生: missing.学生, 
+            漏修课程: remainingCourses.join(', ') 
+        }; 
+    }).filter(Boolean); 
+}
 
         // 第二步：处理漏修课程
         async function handleMissingFile(files) {
