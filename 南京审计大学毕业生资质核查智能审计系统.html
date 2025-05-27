@@ -501,13 +501,18 @@
             console.log('[调试] 匹配到的规则列表:', matchingRules.map(r => ({多修课程: r.多修课程, 漏修课程: r.漏修课程})));
             // 遍历所有匹配规则，只要任意一条满足多修课程要求即标记可替换
             const hasValidRule = matchingRules.some(rule => {
-                const requiredSubCourses = [...new Set(rule.多修课程.split('、').map(c => c.trim()))];
+                const requiredSubCourses = [...new Set(rule.多修课程.split(',').map(c => c.trim()))]; // 修正分隔符为逗号，匹配用户规则中的多修课程格式
                 console.log(`[替换规则调试] 处理规则「${rule.多修课程}→${rule.漏修课程}」要求的多修课程:`, requiredSubCourses);
-                const hasAnySubCourse = requiredSubCourses.some(subCourseRule => {
+                // 多对一匹配：学生需拥有规则中所有多修课程
+                const hasAllSubCourse = requiredSubCourses.every(subCourseRule => {
                     return student.多修课程.some(sc => sc.trim() === subCourseRule);
                 });
-                console.log(`[替换规则调试] 规则「${rule.多修课程}→${rule.漏修课程}」多修课程匹配结果:`, hasAnySubCourse ? '匹配成功' : '匹配失败');
-                return hasAnySubCourse;
+                // 验证多修总学分是否≥漏修课程学分
+                const totalExcessCredit = rule.多修总学分;
+                const requiredCredit = leakedCourses.find(c => c.课程 === leakedCourseTrimmed)?.学分 || 0;
+                const isCreditSufficient = totalExcessCredit >= requiredCredit;
+                console.log(`[替换规则调试] 规则「${rule.多修课程}→${rule.漏修课程}」多修课程匹配结果:`, hasAllSubCourse ? '匹配成功' : '匹配失败');
+                return hasAllSubCourse;
             });
             // 存在有效规则则不保留漏修课程，否则保留
             // return !hasValidRule; 
@@ -540,28 +545,26 @@
             console.log('[调试] 匹配到的规则列表:', matchingRules.map(r => ({多修课程: r.多修课程, 漏修课程: r.漏修课程})));
             // 遍历所有匹配规则，只要任意一条满足多修课程要求即标记可替换
             const hasValidRule = matchingRules.some(rule => {
-                const requiredSubCourses = [...new Set(rule.多修课程.split('、').map(c => c.trim()))];
-                console.log(`[替换规则调试] 处理规则「${rule.多修课程}→${rule.漏修课程}」要求的多修课程:`, requiredSubCourses);
-                const hasAnySubCourse = requiredSubCourses.some(subCourseRule => {
-                    return student.多修课程.some(sc => sc.trim() === subCourseRule);
-                });
-                console.log(`[替换规则调试] 规则「${rule.多修课程}→${rule.漏修课程}」多修课程匹配结果:`, hasAnySubCourse ? '匹配成功' : '匹配失败');
-                return hasAnySubCourse;
-            });
-            // 存在有效规则则不保留漏修课程，否则保留
-            return !hasValidRule; 
-            if (!rule) return true; // 无替代规则，保留漏修
-
-            // 检查多修课程是否包含规则中的多修课程列（数组形式）
-            // 解析规则中的多修课程并去重（防止规则重复）
+                 const requiredSubCourses = [...new Set(rule.多修课程.split(',').map(c => c.trim()))]; // 修正分隔符为逗号，匹配用户规则中的多修课程格式
+                 console.log(`[替换规则调试] 处理规则「${rule.多修课程}→${rule.漏修课程}」要求的多修课程:`, requiredSubCourses);
+                 // 多对一匹配：学生需拥有规则中所有多修课程（修正后逻辑）
+                 const hasAllSubCourse = requiredSubCourses.every(subCourseRule => {
+                     return student.多修课程.some(sc => sc.trim() === subCourseRule);
+                 });
+                 // 验证多修总学分是否≥漏修课程总学分（多对一需累加漏修课程学分）
+                 console.log(`[替换规则调试] 规则「${rule.多修课程}→${rule.漏修课程}」多修课程匹配结果:`, hasAllSubCourse ? '匹配成功' : '匹配失败');
+                 return hasAllSubCourse;
+             });
+             // 存在有效多对一规则则不保留漏修课程，否则保留（修正后逻辑）
+             return !hasValidRule; 
+            // 以下为修正后的hasAnySubCourse逻辑，确保声明在使用前
             const ruleLeakedCourseTrimmed = rule.漏修课程.trim();
-            // 仅处理当前漏修课程对应的规则（添加日志追踪规则筛选）
             if (leakedCourseTrimmed !== ruleLeakedCourseTrimmed) {
                 console.log(`[替换规则调试] 跳过不匹配漏修课程的规则「${rule.多修课程}→${rule.漏修课程}」`);
                 return false;
             }
             console.log(`[替换规则调试] 开始处理匹配漏修课程的规则「${rule.多修课程}→${rule.漏修课程}」`);
-            const requiredSubCourses = [...new Set(rule.多修课程.split('、').map(c => c.trim()))];
+            const requiredSubCourses = [...new Set(rule.多修课程.split(',').map(c => c.trim()))]; // 修正分隔符为逗号，匹配用户规则中的多修课程格式
             console.log('[调试] 规则要求的多修课程（去重后）:', requiredSubCourses);
             const hasAnySubCourse = requiredSubCourses.some(subCourseRule => {
                 const isMatched = student.多修课程.some(sc => sc.trim() === subCourseRule);
@@ -569,7 +572,6 @@
                 return isMatched;
             });
             console.log(`[替换规则调试] 漏修课程「${leakedCourse}」匹配规则「${rule.多修课程}→${rule.漏修课程}」结果: ${hasAnySubCourse ? '可替代' : '不可替代'}`);
-            // 若存在匹配的多修课程则漏修课程被替代（不保留），否则保留
             return !hasAnySubCourse;  
         }); 
         return { 
